@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>DREAM Wealth Assistant</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #222; }
+  #chat { border: 1px solid #ddd; border-radius: 8px; padding: 16px; height: 420px; overflow-y: auto; margin-bottom: 12px; background: #fafafa; }
+  .msg { margin: 10px 0; line-height: 1.45; white-space: pre-wrap; }
+  .user { text-align: right; color: #2c3e50; }
+  .assistant { text-align: left; color: #16a085; }
+  #input-row { display: flex; gap: 8px; }
+  #message { flex: 1; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
+  button { padding: 10px 16px; border: none; border-radius: 6px; background: #2c3e50; color: white; cursor: pointer; font-size: 14px; }
+  button:hover { background: #1a252f; }
+  #stage { font-size: 13px; color: #888; margin-bottom: 8px; }
+  #report-row { margin-top: 16px; }
+</style>
+</head>
+<body>
+  <h2>D.R.E.A.M. Wealth Assistant</h2>
+  <div id="stage">Stage: diagnose</div>
+  <div id="chat"></div>
+  <div id="input-row">
+    <input id="message" placeholder="Type your reply..." autocomplete="off" />
+    <button onclick="send()">Send</button>
+  </div>
+  <div id="report-row">
+    <button onclick="downloadReport()">Download report (available once stage is "done")</button>
+  </div>
+
+<script>
+const userId = "demo-user"; // swap for a real identity once you add auth
+const chatEl = document.getElementById("chat");
+const stageEl = document.getElementById("stage");
+
+function addMessage(role, text) {
+  const div = document.createElement("div");
+  div.className = "msg " + role;
+  div.textContent = text;
+  chatEl.appendChild(div);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+async function send() {
+  const input = document.getElementById("message");
+  const text = input.value.trim();
+  if (!text) return;
+  addMessage("user", text);
+  input.value = "";
+
+  try {
+    const res = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, message: text }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    addMessage("assistant", data.reply);
+    stageEl.textContent = "Stage: " + data.stage;
+  } catch (err) {
+    addMessage("assistant", "Error: " + err.message);
+  }
+}
+
+async function downloadReport() {
+  try {
+    const genRes = await fetch("/report/" + userId, { method: "POST" });
+    if (!genRes.ok) {
+      alert((await genRes.json()).detail || "Report not ready yet.");
+      return;
+    }
+    window.location.href = "/report/" + userId + "/download";
+  } catch (err) {
+    alert("Error generating report: " + err.message);
+  }
+}
+
+document.getElementById("message").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") send();
+});
+
+// Kick off the conversation
+addMessage("assistant", "Hi — let's start with your current reality. What's your monthly income?");
+</script>
+</body>
+</html>

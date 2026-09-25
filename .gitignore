@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.pyc
+dream_app.db
+reports/*.pdf
+.venv/
