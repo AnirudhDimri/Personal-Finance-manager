@@ -2,7 +2,7 @@ import os
 
 from dotenv import load_dotenv
 
-load_dotenv()  # must run before anthropic_client reads ANTHROPIC_API_KEY
+load_dotenv()  # must run before llm_client reads DEEPSEEK_API_KEY
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse

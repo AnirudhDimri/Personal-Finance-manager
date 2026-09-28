@@ -11,7 +11,7 @@ cd dream-wealth-app
 python -m venv .venv
 source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env           # then edit .env and paste your ANTHROPIC_API_KEY
+cp .env.example .env           # then edit .env and paste your DEEPSEEK_API_KEY
 uvicorn main:app --reload
 ```
 
