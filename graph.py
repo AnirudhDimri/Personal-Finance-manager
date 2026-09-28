@@ -8,7 +8,6 @@ from nodes import allocate_node, diagnose_node, execute_node, habits_node, rewir
 class DreamState(TypedDict, total=False):
     user_id: str
     stage: str
-    last_message: str
     last_reply: str
     financials: Dict[str, Any]
     dreams: List[Dict[str, Any]]

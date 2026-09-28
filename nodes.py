@@ -1,10 +1,21 @@
-from llm_client import call_plain, call_stage_llm
 from calculations import compute_goal_gaps, compute_net_worth, generate_budget
+from llm_client import call_plain, call_stage_llm
 from rag import retrieve_reframe
 
-# ---------------------------------------------------------------------------
-# Stage 1: Dream & Diagnose
-# ---------------------------------------------------------------------------
+
+def _last_user_text(state: dict) -> str:
+    for message in reversed(state.get("conversation_history") or []):
+        if message.get("role") == "user":
+            return message.get("content") or ""
+    return ""
+
+
+def _set_reply(state: dict, reply: str) -> None:
+    state["last_reply"] = reply or ""
+    state.setdefault("conversation_history", []).append(
+        {"role": "assistant", "content": state["last_reply"]}
+    )
+
 
 DIAGNOSE_SYSTEM = """You are the "Diagnose" stage of a personal finance assistant \
 built on the D.R.E.A.M. Wealth Framework.
@@ -40,9 +51,7 @@ Respond with STRICT JSON ONLY, no markdown fences, no extra text, in this shape:
 
 
 def diagnose_node(state: dict) -> dict:
-    result = call_stage_llm(
-        DIAGNOSE_SYSTEM, state.get("last_message", ""), state.get("conversation_history", [])
-    )
+    result = call_stage_llm(DIAGNOSE_SYSTEM, state.get("conversation_history", []))
 
     state.setdefault("financials", {})
     extracted = result.get("extracted", {}) or {}
@@ -53,8 +62,7 @@ def diagnose_node(state: dict) -> dict:
     if "dreams" in extracted:
         state["dreams"] = extracted["dreams"]
 
-    state["last_reply"] = result.get("reply", "")
-    state["conversation_history"].append({"role": "assistant", "content": state["last_reply"]})
+    _set_reply(state, result.get("reply", ""))
 
     if result.get("complete"):
         state["financials"]["net_worth"] = compute_net_worth(state["financials"])
@@ -62,10 +70,6 @@ def diagnose_node(state: dict) -> dict:
 
     return state
 
-
-# ---------------------------------------------------------------------------
-# Stage 2: Rewire Your Relationship with Money
-# ---------------------------------------------------------------------------
 
 REWIRE_SYSTEM_TEMPLATE = """You are the "Rewire" stage of a personal finance assistant.
 
@@ -83,31 +87,29 @@ Respond with STRICT JSON ONLY, in this shape:
 
 
 def rewire_node(state: dict) -> dict:
-    user_msg = state.get("last_message", "")
+    user_msg = _last_user_text(state)
     retrieved = retrieve_reframe(user_msg) if user_msg else ""
     system = REWIRE_SYSTEM_TEMPLATE.format(retrieved=retrieved)
 
-    result = call_stage_llm(system, user_msg, state.get("conversation_history", []))
+    result = call_stage_llm(system, state.get("conversation_history", []))
 
     state.setdefault("beliefs", [])
     extracted = result.get("extracted", {}) or {}
     if extracted.get("belief"):
         state["beliefs"].append(
-            {"belief": extracted["belief"], "reframe": extracted.get("reframe", retrieved)}
+            {
+                "belief": extracted["belief"],
+                "reframe": extracted.get("reframe", retrieved),
+            }
         )
 
-    state["last_reply"] = result.get("reply", "")
-    state["conversation_history"].append({"role": "assistant", "content": state["last_reply"]})
+    _set_reply(state, result.get("reply", ""))
 
     if result.get("complete"):
         state["stage"] = "execute"
 
     return state
 
-
-# ---------------------------------------------------------------------------
-# Stage 3: Execute the System
-# ---------------------------------------------------------------------------
 
 EXECUTE_EXPLAIN_SYSTEM = (
     "Explain this budget breakdown to the user in plain, encouraging, "
@@ -118,18 +120,10 @@ EXECUTE_EXPLAIN_SYSTEM = (
 def execute_node(state: dict) -> dict:
     budget = generate_budget(state.get("financials", {}))
     state["budget"] = budget
-
-    reply = call_plain(EXECUTE_EXPLAIN_SYSTEM, f"Budget: {budget}")
-
-    state["last_reply"] = reply
-    state["conversation_history"].append({"role": "assistant", "content": reply})
+    _set_reply(state, call_plain(EXECUTE_EXPLAIN_SYSTEM, f"Budget: {budget}"))
     state["stage"] = "allocate"
     return state
 
-
-# ---------------------------------------------------------------------------
-# Stage 4: Allocate & Align
-# ---------------------------------------------------------------------------
 
 ALLOCATE_EXPLAIN_SYSTEM = (
     "Explain these goal-gap numbers in plain, jargon-free language. For each "
@@ -142,24 +136,19 @@ ALLOCATE_EXPLAIN_SYSTEM = (
 
 def allocate_node(state: dict) -> dict:
     budget = state.get("budget", {})
-    surplus = budget.get("savings", 0)
+    surplus = budget.get("surplus", 0)
     gaps = compute_goal_gaps(state.get("dreams", []), surplus)
     state["goal_gaps"] = gaps
-
-    reply = call_plain(
-        ALLOCATE_EXPLAIN_SYSTEM,
-        f"Goal gaps: {gaps}\nMonthly savings available: {surplus}",
+    _set_reply(
+        state,
+        call_plain(
+            ALLOCATE_EXPLAIN_SYSTEM,
+            f"Goal gaps: {gaps}\nMonthly surplus available: {surplus}",
+        ),
     )
-
-    state["last_reply"] = reply
-    state["conversation_history"].append({"role": "assistant", "content": reply})
     state["stage"] = "habits"
     return state
 
-
-# ---------------------------------------------------------------------------
-# Stage 5: Money Habits That Last
-# ---------------------------------------------------------------------------
 
 HABITS_SYSTEM = """You are the final stage of a personal finance assistant.
 
@@ -174,10 +163,8 @@ Respond with STRICT JSON ONLY, in this shape:
 
 def habits_node(state: dict) -> dict:
     context = f"Budget: {state.get('budget')}\nGoal gaps: {state.get('goal_gaps')}"
-    result = call_stage_llm(HABITS_SYSTEM, context, [])
-
+    result = call_stage_llm(HABITS_SYSTEM, [], extra_user=context)
     state["habits"] = (result.get("extracted", {}) or {}).get("habits", [])
-    state["last_reply"] = result.get("reply", "")
-    state["conversation_history"].append({"role": "assistant", "content": state["last_reply"]})
+    _set_reply(state, result.get("reply", ""))
     state["stage"] = "done"
     return state

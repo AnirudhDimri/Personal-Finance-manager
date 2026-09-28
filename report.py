@@ -9,8 +9,12 @@ REPORTS_DIR = os.path.join(os.path.dirname(__file__), "reports")
 os.makedirs(REPORTS_DIR, exist_ok=True)
 
 
+def report_file_path(user_id: str) -> str:
+    return os.path.join(REPORTS_DIR, f"{user_id}_summary.pdf")
+
+
 def generate_report(user_id: str, state: dict) -> str:
-    path = os.path.join(REPORTS_DIR, f"{user_id}_summary.pdf")
+    path = report_file_path(user_id)
     doc = SimpleDocTemplate(path, pagesize=letter)
     styles = getSampleStyleSheet()
     story = []

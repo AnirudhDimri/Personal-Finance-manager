@@ -7,12 +7,13 @@ downloadable "Money Clarity Report" PDF.
 ## Setup
 
 ```bash
-cd dream-wealth-app
-python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
+cd Personal-Finance-manager
+python -m venv ve
+ve\Scripts\activate            # macOS/Linux: source ve/bin/activate
 pip install -r requirements.txt
-cp .env.example .env           # then edit .env and paste your DEEPSEEK_API_KEY
-uvicorn main:app --reload
+copy .env.example .env         # macOS/Linux: cp .env.example .env
+# then paste your DEEPSEEK_API_KEY into .env
+python -m uvicorn main:app --reload
 ```
 
 Open **http://localhost:8000/app/index.html** in a browser to try the chat demo.
@@ -58,6 +59,3 @@ Open **http://localhost:8000/app/index.html** in a browser to try the chat demo.
 - No bank/UPI statement parsing — all figures are self-reported.
 - No WhatsApp/Telegram nudges for the Habits stage.
 - No real vector DB for the mindset corpus (see `rag.py`).
-
-These are all additive later — see the project scope document for the
-suggested phasing.

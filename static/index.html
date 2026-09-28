@@ -81,8 +81,24 @@ document.getElementById("message").addEventListener("keydown", (e) => {
   if (e.key === "Enter") send();
 });
 
-// Kick off the conversation
-addMessage("assistant", "Hi — let's start with your current reality. What's your monthly income?");
+async function loadSession() {
+  try {
+    const res = await fetch("/state/" + userId);
+    if (!res.ok) throw new Error();
+    const state = await res.json();
+    const history = state.conversation_history || [];
+    if (history.length) {
+      history.forEach((m) => addMessage(m.role === "user" ? "user" : "assistant", m.content));
+      stageEl.textContent = "Stage: " + (state.stage || "diagnose");
+      return;
+    }
+  } catch (_) {
+    /* first visit or API down — show a generic opener */
+  }
+  addMessage("assistant", "Hi — whenever you're ready, tell me about your current money situation.");
+}
+
+loadSession();
 </script>
 </body>
 </html>

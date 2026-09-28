@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from db import get_state, save_state
 from graph import build_graph
-from report import generate_report
+from report import generate_report, report_file_path
 
 app = FastAPI(title="DREAM Wealth Framework API")
 graph = build_graph()
@@ -30,7 +30,6 @@ class ChatRequest(BaseModel):
 def chat(req: ChatRequest):
     state = get_state(req.user_id)
     state["user_id"] = req.user_id
-    state["last_message"] = req.message
     state.setdefault("conversation_history", [])
     state["conversation_history"].append({"role": "user", "content": req.message})
 
@@ -62,7 +61,7 @@ def create_report(user_id: str):
 
 @app.get("/report/{user_id}/download")
 def download_report(user_id: str):
-    path = os.path.join(os.path.dirname(__file__), "reports", f"{user_id}_summary.pdf")
+    path = report_file_path(user_id)
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Report not generated yet — POST /report/{user_id} first.")
     return FileResponse(path, media_type="application/pdf", filename="money_clarity_report.pdf")

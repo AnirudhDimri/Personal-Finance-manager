@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Optional
 
 from openai import OpenAI
 
@@ -25,33 +26,36 @@ def _text_from_response(response) -> str:
     return (response.choices[0].message.content or "").strip()
 
 
-def call_stage_llm(system_prompt: str, user_message: str, history: list) -> dict:
-    """
-    Calls DeepSeek with a system prompt that instructs it to reply with strict JSON:
-        {"reply": str, "extracted": dict, "complete": bool}
-    Falls back to treating the raw text as the reply if JSON parsing fails,
-    so a malformed model response never crashes the app.
-    """
-    client = get_client()
-
-    clean_history = [
+def _chat_messages(history: list) -> list:
+    return [
         {"role": m["role"], "content": m["content"]}
         for m in history
         if m.get("role") in ("user", "assistant")
     ]
-    messages = (
-        [{"role": "system", "content": system_prompt}]
-        + clean_history
-        + [{"role": "user", "content": user_message}]
-    )
 
-    response = client.chat.completions.create(
+
+def call_stage_llm(
+    system_prompt: str,
+    history: list,
+    extra_user: Optional[str] = None,
+) -> dict:
+    """
+    Calls DeepSeek with a system prompt that instructs it to reply with strict JSON:
+        {"reply": str, "extracted": dict, "complete": bool}
+    Falls back to treating the raw text as the reply if JSON parsing fails.
+    Pass extra_user only when that turn is not already the last item in history
+    (e.g. Habits, which sends budget/gaps as a one-off prompt).
+    """
+    messages = [{"role": "system", "content": system_prompt}] + _chat_messages(history)
+    if extra_user:
+        messages.append({"role": "user", "content": extra_user})
+
+    response = get_client().chat.completions.create(
         model=MODEL,
         max_tokens=800,
         response_format={"type": "json_object"},
         messages=messages,
     )
-
     text = _text_from_response(response)
 
     try:
@@ -62,8 +66,7 @@ def call_stage_llm(system_prompt: str, user_message: str, history: list) -> dict
 
 def call_plain(system_prompt: str, user_content: str, max_tokens: int = 500) -> str:
     """Plain-text call for stages that don't need structured extraction (Execute, Allocate)."""
-    client = get_client()
-    response = client.chat.completions.create(
+    response = get_client().chat.completions.create(
         model=MODEL,
         max_tokens=max_tokens,
         messages=[

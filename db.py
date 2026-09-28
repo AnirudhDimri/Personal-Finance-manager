@@ -33,7 +33,6 @@ def _default_state(user_id: str) -> dict:
         "goal_gaps": [],
         "habits": [],
         "conversation_history": [],
-        "last_message": "",
         "last_reply": "",
     }
 
