@@ -10,10 +10,12 @@ def _last_user_text(state: dict) -> str:
     return ""
 
 
-def _set_reply(state: dict, reply: str) -> None:
-    state["last_reply"] = reply or ""
+def _set_reply(state: dict, reply: str, *, keep_prior: bool = False) -> None:
+    reply = reply or ""
+    prior = state.get("last_reply") or ""
+    state["last_reply"] = f"{prior}\n\n{reply}".strip() if keep_prior and prior else reply
     state.setdefault("conversation_history", []).append(
-        {"role": "assistant", "content": state["last_reply"]}
+        {"role": "assistant", "content": reply}
     )
 
 
@@ -120,7 +122,11 @@ EXECUTE_EXPLAIN_SYSTEM = (
 def execute_node(state: dict) -> dict:
     budget = generate_budget(state.get("financials", {}))
     state["budget"] = budget
-    _set_reply(state, call_plain(EXECUTE_EXPLAIN_SYSTEM, f"Budget: {budget}"))
+    _set_reply(
+        state,
+        call_plain(EXECUTE_EXPLAIN_SYSTEM, f"Budget: {budget}"),
+        keep_prior=True,
+    )
     state["stage"] = "allocate"
     return state
 
@@ -145,6 +151,7 @@ def allocate_node(state: dict) -> dict:
             ALLOCATE_EXPLAIN_SYSTEM,
             f"Goal gaps: {gaps}\nMonthly surplus available: {surplus}",
         ),
+        keep_prior=True,
     )
     state["stage"] = "habits"
     return state
@@ -165,6 +172,6 @@ def habits_node(state: dict) -> dict:
     context = f"Budget: {state.get('budget')}\nGoal gaps: {state.get('goal_gaps')}"
     result = call_stage_llm(HABITS_SYSTEM, [], extra_user=context)
     state["habits"] = (result.get("extracted", {}) or {}).get("habits", [])
-    _set_reply(state, result.get("reply", ""))
+    _set_reply(state, result.get("reply", ""), keep_prior=True)
     state["stage"] = "done"
     return state

@@ -26,12 +26,17 @@ def _text_from_response(response) -> str:
     return (response.choices[0].message.content or "").strip()
 
 
+# Cap what we send to the model; full history still stays in SQLite.
+_MAX_HISTORY_MESSAGES = 20
+
+
 def _chat_messages(history: list) -> list:
-    return [
+    msgs = [
         {"role": m["role"], "content": m["content"]}
         for m in history
         if m.get("role") in ("user", "assistant")
     ]
+    return msgs[-_MAX_HISTORY_MESSAGES:]
 
 
 def call_stage_llm(
